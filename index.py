@@ -3,14 +3,17 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
+from dotenv import load_dotenv
 import google.generativeai as genai
 import os
-from dotenv import load_dotenv
 
+# Load .env and set Gemini API key
 load_dotenv()
-genai.configure(api_key=os.getenv("AIzaSyBRGOawlVufmtKxaRX1uPsrXxfaJTvH7dY"))
+genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
 app = FastAPI()
+
+# Mount static files and templates
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
@@ -18,11 +21,11 @@ class Message(BaseModel):
     text: str
 
 @app.get("/", response_class=HTMLResponse)
-def get_home(request: Request):
+async def get_home(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
 @app.post("/chat")
-def chat(message: Message):
+async def chat(message: Message):
     try:
         model = genai.GenerativeModel("gemini-pro")
         response = model.generate_content(message.text)
