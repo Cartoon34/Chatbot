@@ -1,28 +1,31 @@
 from fastapi import FastAPI, Request
-from fastapi.middleware.cors import CORSMiddleware
-import openai
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+from pydantic import BaseModel
+import google.generativeai as genai
 import os
+from dotenv import load_dotenv
 
-openai.api_key = os.getenv("OPENAI_API_KEY")
+load_dotenv()
+genai.configure(api_key=os.getenv("AIzaSyBRGOawlVufmtKxaRX1uPsrXxfaJTvH7dY"))
 
 app = FastAPI()
+app.mount("/static", StaticFiles(directory="static"), name="static")
+templates = Jinja2Templates(directory="templates")
 
-# CORS config so frontend can talk to backend
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # Replace with frontend URL in production
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+class Message(BaseModel):
+    text: str
+
+@app.get("/", response_class=HTMLResponse)
+def get_home(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request})
 
 @app.post("/chat")
-async def chat(request: Request):
-    data = await request.json()
-    user_message = data.get("message")
-
-    response = openai.ChatCompletion.create(
-        model="gpt-3.5-turbo",
-        messages=[{"role": "user", "content": user_message}]
-    )
-
-    return {"response": response["choices"][0]["message"]["content"]}
+def chat(message: Message):
+    try:
+        model = genai.GenerativeModel("gemini-pro")
+        response = model.generate_content(message.text)
+        return {"response": response.text.strip()}
+    except Exception as e:
+        return {"response": f"⚠️ Error: {str(e)}"}
